@@ -1,0 +1,16 @@
+# Bağımlılıklar ve build çıktıları
+/node_modules
+/.next/
+/out/
+/build
+
+# Gizli Ortam Değişkenleri (KESİNLİKLE YÜKLENMEMELİ)
+.env
+.env*.local
+
+# Geçici dosyalar ve editör kalıntıları
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+project-context.txt
+bundle-context.mjs
