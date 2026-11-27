@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Fish, ShoppingCart, AlertTriangle, Sun } from 'lucide-react';
 import { useAquariumStore } from '@/store/useAquariumStore';
-import AquariumScene from '@/components/scene/AquariumScene';
+import AquariumScene from '@/components/3d/AquariumScene';
 import SearchBar from '@/components/ui/SearchBar';
 import CatalogDrawer from '@/components/ui/CatalogDrawer';
 import SideStatusPanel from '@/components/ui/SideStatusPanel';

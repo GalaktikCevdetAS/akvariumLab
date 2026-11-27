@@ -12,21 +12,119 @@ import {
   Layers,
   Wrench,
   Shell,
-  Bug,
   Sparkles,
-  Leaf,
-  Trees,
-  Waves,
-  Fan,
-  Flame,
-  Package,
-  Mountain,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
-import { useAquariumStore } from '../../store/useAquariumStore';
+import { useAquariumStore, isSpongeOrAirFilter } from '../../store/useAquariumStore';
 import { Product } from '../../lib/supabase/catalogService';
 
 interface CatalogDrawerProps {
   onClose?: () => void;
+}
+
+/** Hava Taşı & Kabarcıklar Özel SVG İkonu */
+function AirStoneIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="4" y="15" width="16" height="5" rx="2.5" />
+      <line x1="8" y1="17.5" x2="8.01" y2="17.5" />
+      <line x1="12" y1="17.5" x2="12.01" y2="17.5" />
+      <line x1="16" y1="17.5" x2="16.01" y2="17.5" />
+      <circle cx="8" cy="10" r="1.3" />
+      <circle cx="12" cy="7" r="1.6" />
+      <circle cx="16" cy="10.5" r="1.2" />
+      <circle cx="10.5" cy="3.5" r="1" />
+      <circle cx="14.5" cy="4" r="1" />
+    </svg>
+  );
+}
+
+/** Akvaryum İç Filtre Özel SVG İkonu */
+function InternalFilterIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Motor kafası ve gövde */}
+      <rect x="7" y="4" width="10" height="17" rx="2" />
+      {/* Motor / kartuş ayrım çizgisi */}
+      <line x1="7" y1="10" x2="17" y2="10" />
+      {/* Su çıkış nozulu */}
+      <path d="M17 7h3v2h-3" />
+      {/* Emiş ızgaraları */}
+      <line x1="10" y1="13.5" x2="14" y2="13.5" />
+      <line x1="10" y1="16.5" x2="14" y2="16.5" />
+      {/* Üst güç kablosu */}
+      <path d="M12 4V2h3" />
+    </svg>
+  );
+}
+
+/** Pipo (Sünger) Filtre Özel SVG İkonu */
+function SpongeFilterIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Yükseltici su çıkış borusu */}
+      <path d="M11 3h2v8h-2z" />
+      {/* Silindirik biyo-sünger gövde */}
+      <rect x="6" y="11" width="12" height="8" rx="2" />
+      {/* Ağır alt taban */}
+      <line x1="4" y1="21" x2="20" y2="21" />
+      {/* Kabarcıklar */}
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="5" r="1.2" />
+    </svg>
+  );
+}
+
+/** Hava Motoru (Hava Pompası) Özel SVG İkonu */
+function AirPumpIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Pompa gövdesi */}
+      <rect x="4" y="7" width="13" height="10" rx="3" />
+      {/* Hava çıkış nozulları */}
+      <line x1="17" y1="10" x2="21" y2="10" />
+      <line x1="17" y1="14" x2="21" y2="14" />
+      {/* LED & soğutma çizgisi */}
+      <circle cx="8" cy="11" r="1" />
+      <line x1="8" y1="14" x2="13" y2="14" />
+      {/* Kauçuk ayaklar */}
+      <line x1="7" y1="17" x2="7" y2="19" />
+      <line x1="14" y1="17" x2="14" y2="19" />
+    </svg>
+  );
 }
 
 interface SubCategoryConfig {
@@ -51,59 +149,57 @@ const CATEGORY_THEMES: CategoryThemeConfig[] = [
     id: 'canlilar',
     label: 'Canlılar',
     icon: Fish,
-    activeTabClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/60 shadow-sm shadow-cyan-500/15',
+    activeTabClass:
+      'bg-cyan-500/20 text-cyan-300 border-cyan-400/60 shadow-sm shadow-cyan-500/15',
     activeSubClass: 'bg-cyan-500 text-slate-950 font-bold',
     badgeTextClass: 'text-cyan-400',
     borderAccentClass: 'hover:border-cyan-500/40',
     subCategories: [
       { id: 'baliklar', label: 'Balıklar', icon: Fish },
       { id: 'karidesler', label: 'Karidesler', icon: Sparkles },
-      { id: 'kabuklular', label: 'Kabuklular', icon: Shell },
-      { id: 'bocekler', label: 'Böcekler', icon: Bug },
+      { id: 'salyangozlar', label: 'Salyangozlar', icon: Shell },
     ],
   },
   {
     id: 'bitkiler',
     label: 'Bitkiler',
     icon: Sprout,
-    activeTabClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/60 shadow-sm shadow-emerald-500/15',
+    activeTabClass:
+      'bg-emerald-500/20 text-emerald-300 border-emerald-400/60 shadow-sm shadow-emerald-500/15',
     activeSubClass: 'bg-emerald-500 text-slate-950 font-bold',
     badgeTextClass: 'text-emerald-400',
     borderAccentClass: 'hover:border-emerald-500/40',
     subCategories: [
-      { id: 'govdeli', label: 'Gövdeli', icon: Leaf },
-      { id: 'rizom', label: 'Kök / Rizom', icon: Trees },
-      { id: 'yosunlar', label: 'Yosunlar', icon: Sprout },
-      { id: 'su-ustu', label: 'Su Üstü', icon: Waves },
+      { id: 'bitkiler', label: 'Tüm Bitkiler', icon: Sprout },
     ],
   },
   {
     id: 'kumlar',
-    label: 'Taban & Dekor',
+    label: 'Taban & Kumlar',
     icon: Layers,
-    activeTabClass: 'bg-amber-500/20 text-amber-300 border-amber-400/60 shadow-sm shadow-amber-500/15',
+    activeTabClass:
+      'bg-amber-500/20 text-amber-300 border-amber-400/60 shadow-sm shadow-amber-500/15',
     activeSubClass: 'bg-amber-400 text-slate-950 font-bold',
     badgeTextClass: 'text-amber-300',
     borderAccentClass: 'hover:border-amber-500/40',
     subCategories: [
-      { id: 'kum', label: 'Kumlar', icon: Layers },
-      { id: 'aktif-toprak', label: 'Aktif Toprak', icon: Sprout },
-      { id: 'dekor', label: 'Kök & Kaya', icon: Mountain },
+      { id: 'kumlar', label: 'Taban Kumları', icon: Layers },
     ],
   },
   {
     id: 'malzemeler',
-    label: 'Ekipmanlar',
+    label: 'Malzemeler',
     icon: Wrench,
-    activeTabClass: 'bg-violet-500/20 text-violet-300 border-violet-400/60 shadow-sm shadow-violet-500/15',
+    activeTabClass:
+      'bg-violet-500/20 text-violet-300 border-violet-400/60 shadow-sm shadow-violet-500/15',
     activeSubClass: 'bg-violet-400 text-slate-950 font-bold',
     badgeTextClass: 'text-violet-300',
     borderAccentClass: 'hover:border-violet-500/40',
     subCategories: [
-      { id: 'isiklar', label: 'Işıklar', icon: Sun },
-      { id: 'motorlar', label: 'Motor & Filtre', icon: Fan },
-      { id: 'isitici-co2', label: 'Isıtıcı & CO₂', icon: Flame },
-      { id: 'diger-ekipman', label: 'Diğer', icon: Package },
+      { id: 'aydinlatmalar', label: 'Aydınlatma', icon: Sun },
+      { id: 'filtreler', label: 'Filtreler', icon: InternalFilterIcon },
+      { id: 'hava-motorlari', label: 'Hava Motorları', icon: AirPumpIcon },
+      { id: 'hava-taslari', label: 'Hava Taşları', icon: AirStoneIcon },
     ],
   },
 ];
@@ -114,12 +210,12 @@ function ProductThumbnail({ product }: { product: Product }) {
       <img
         src={product.image_url}
         alt={product.name}
-        className="w-16 h-16 rounded-xl object-cover border border-slate-700/70 shrink-0 bg-slate-900"
+        className="w-16 h-16 rounded-xl object-contain p-1 border border-slate-700/70 shrink-0 bg-slate-950"
       />
     );
   }
 
-  if (product.sub_category === 'isiklar' || product.slug.startsWith('led-')) {
+  if (product.sub_category === 'aydinlatmalar' || product.slug.startsWith('led-')) {
     const isThreeColor = product.light_spectrum === 'uc-renk';
     const isBlueWhite = product.light_spectrum === 'beyaz-mavi';
     return (
@@ -146,10 +242,8 @@ function ProductThumbnail({ product }: { product: Product }) {
 
   if (product.category === 'canlilar') {
     const IconComp =
-      product.sub_category === 'kabuklular'
+      product.sub_category === 'salyangozlar'
         ? Shell
-        : product.sub_category === 'bocekler'
-        ? Bug
         : product.sub_category === 'karidesler'
         ? Sparkles
         : Fish;
@@ -162,7 +256,9 @@ function ProductThumbnail({ product }: { product: Product }) {
       >
         <IconComp className="w-7 h-7" style={{ color: product.color }} />
         <span className="text-[9px] font-medium text-cyan-200/80 mt-0.5 capitalize">
-          {product.variant && product.variant !== 'standart' ? product.variant : product.sub_category}
+          {product.variant && product.variant !== 'standart'
+            ? product.variant
+            : product.sub_category}
         </span>
       </div>
     );
@@ -172,9 +268,7 @@ function ProductThumbnail({ product }: { product: Product }) {
     return (
       <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-emerald-950 to-slate-900 border border-emerald-500/30 shrink-0 flex flex-col items-center justify-center">
         <Sprout className="w-7 h-7 text-emerald-400" />
-        <span className="text-[9px] font-medium text-emerald-300 mt-0.5 capitalize">
-          {product.sub_category}
-        </span>
+        <span className="text-[9px] font-medium text-emerald-300 mt-0.5">Bitki</span>
       </div>
     );
   }
@@ -188,10 +282,46 @@ function ProductThumbnail({ product }: { product: Product }) {
     );
   }
 
+  // Hava Taşı Özel Thumbnail İkonu
+  if (product.sub_category === 'hava-taslari') {
+    const isLong =
+      product.slug.includes('uzun') ||
+      product.slug.includes('cubuk') ||
+      (product.length_cm || 0) >= 8;
+    const isDisc =
+      product.slug.includes('disk') || product.slug.includes('difuzor');
+
+    return (
+      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-sky-950/80 to-slate-900 border border-sky-500/35 shrink-0 flex flex-col items-center justify-center">
+        <AirStoneIcon className="w-7 h-7 text-sky-400" />
+        <span className="text-[9px] font-medium text-sky-300 mt-0.5">
+          {isDisc ? 'Disk' : isLong ? `${product.length_cm || 15}cm` : 'Silindir'}
+        </span>
+      </div>
+    );
+  }
+
+  // Filtreler Özel Thumbnail İkonu (Pipo Filtre vs Motorlu İç Filtre)
+  if (product.sub_category === 'filtreler') {
+    const isPipo = isSpongeOrAirFilter(product);
+    const FilterIcon = isPipo ? SpongeFilterIcon : InternalFilterIcon;
+    return (
+      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-500/35 shrink-0 flex flex-col items-center justify-center">
+        <FilterIcon className="w-7 h-7 text-indigo-400" />
+        <span className="text-[9px] font-medium text-indigo-300 mt-0.5">
+          {isPipo ? 'Pipo' : 'İç Filtre'}
+        </span>
+      </div>
+    );
+  }
+
+  // Hava Motoru Özel Thumbnail İkonu
   return (
-    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-950/70 to-slate-900 border border-violet-500/30 shrink-0 flex flex-col items-center justify-center">
-      <Fan className="w-6 h-6 text-violet-400" />
-      <span className="text-[9px] font-medium text-violet-300 mt-0.5">Ekipman</span>
+    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-violet-950/75 to-slate-900 border border-violet-500/35 shrink-0 flex flex-col items-center justify-center">
+      <AirPumpIcon className="w-7 h-7 text-violet-400" />
+      <span className="text-[9px] font-medium text-violet-300 mt-0.5">
+        {product.outlet_count && product.outlet_count >= 2 ? '2 Çıkış' : '1 Çıkış'}
+      </span>
     </div>
   );
 }
@@ -199,6 +329,9 @@ function ProductThumbnail({ product }: { product: Product }) {
 export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
   const {
     catalog,
+    catalogSource,
+    catalogError,
+    loadCatalog,
     tankItems,
     selectedCategory,
     setSelectedCategory,
@@ -219,6 +352,12 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
   const [lightKelvinFilter, setLightKelvinFilter] = useState<number | null>(null);
 
   useEffect(() => {
+    if (catalog.length === 0) {
+      loadCatalog();
+    }
+  }, []);
+
+  useEffect(() => {
     setSelectedSubCategory(activeTheme.subCategories[0].id);
   }, [activeTheme]);
 
@@ -226,7 +365,7 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
     if (p.category !== activeTheme.id) return false;
     if (p.sub_category !== selectedSubCategory) return false;
 
-    if (activeTheme.id === 'malzemeler' && p.sub_category === 'isiklar') {
+    if (activeTheme.id === 'malzemeler' && p.sub_category === 'aydinlatmalar') {
       if (lightLengthFilter !== null && p.length_cm !== lightLengthFilter) return false;
       if (lightColorFilter !== null && p.light_spectrum !== lightColorFilter) return false;
       if (lightKelvinFilter !== null && p.kelvin !== lightKelvinFilter) return false;
@@ -246,17 +385,39 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
         <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
           <activeTheme.icon className={`w-5 h-5 ${activeTheme.badgeTextClass}`} />
           <span>Ürün Kataloğu</span>
+          <span className="text-[11px] font-normal text-slate-400">
+            ({catalog.length})
+          </span>
         </h3>
-        {onClose && (
+        <div className="flex items-center gap-1">
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
-            title="Kataloğu Kapat"
+            onClick={() => loadCatalog()}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition"
+            title="Supabase'den Yenile"
           >
-            <X className="w-4 h-4" />
+            <RefreshCw
+              className={`w-4 h-4 ${catalogSource === 'loading' ? 'animate-spin text-cyan-400' : ''}`}
+            />
           </button>
-        )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Kataloğu Kapat"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Supabase Bağlantı / RLS Hata Bildirimi */}
+      {catalogError && (
+        <div className="bg-rose-950/70 border border-rose-500/40 rounded-xl p-2.5 text-[11px] text-rose-200 flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="break-words">{catalogError}</div>
+        </div>
+      )}
 
       {/* 1. Ana Kategori Sekmeleri */}
       <div className="grid grid-cols-2 gap-1.5">
@@ -281,29 +442,31 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
       </div>
 
       {/* 2. Aktif Kategorinin Alt Kategorileri */}
-      <div className="flex flex-wrap gap-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
-        {activeTheme.subCategories.map((sub) => {
-          const isSubActive = selectedSubCategory === sub.id;
-          const SubIcon = sub.icon;
-          return (
-            <button
-              key={sub.id}
-              onClick={() => setSelectedSubCategory(sub.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] transition ${
-                isSubActive
-                  ? activeTheme.activeSubClass
-                  : 'bg-slate-800/70 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <SubIcon className="w-3 h-3 shrink-0" />
-              <span>{sub.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {activeTheme.subCategories.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+          {activeTheme.subCategories.map((sub) => {
+            const isSubActive = selectedSubCategory === sub.id;
+            const SubIcon = sub.icon;
+            return (
+              <button
+                key={sub.id}
+                onClick={() => setSelectedSubCategory(sub.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] transition ${
+                  isSubActive
+                    ? activeTheme.activeSubClass
+                    : 'bg-slate-800/70 text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <SubIcon className="w-3.5 h-3.5 shrink-0" />
+                <span>{sub.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {/* 3. Ekipman -> Işıklar seçiliyken LED Boy / Renk / Kelvin Filtresi (Tekrar tıklanınca filtre kalkar) */}
-      {activeTheme.id === 'malzemeler' && selectedSubCategory === 'isiklar' && (
+      {/* 3. Malzemeler -> Aydınlatma seçiliyken LED Boy / Renk / Kelvin Filtresi */}
+      {activeTheme.id === 'malzemeler' && selectedSubCategory === 'aydinlatmalar' && (
         <div className="bg-violet-950/25 border border-violet-500/25 rounded-xl p-2.5 space-y-2">
           <div className="text-[11px] font-semibold text-violet-300 flex items-center gap-1">
             <Sun className="w-3.5 h-3.5 text-amber-300" /> LED Armatür Filtresi (Boy • Renk • Kelvin)
@@ -383,7 +546,11 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
 
       {/* 4. Resimli Ürün Listesi */}
       <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
-        {filtered.length === 0 ? (
+        {catalogSource === 'loading' ? (
+          <div className="text-center py-10 text-xs text-cyan-400">
+            Ürünler Supabase&apos;den yükleniyor...
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-10 text-xs text-slate-500">
             Bu alt kategoride henüz ürün bulunmuyor.
           </div>
@@ -414,9 +581,16 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
                         • {product.lumen} lm ({product.kelvin || 6500}K)
                       </span>
                     )}
-                    <span className="text-[10px] text-slate-500">
-                      • Min {product.min_liters}L
-                    </span>
+                    {product.watt !== undefined && product.watt > 0 && (
+                      <span className="text-[10px] text-violet-300">
+                        • {product.watt}W
+                      </span>
+                    )}
+                    {product.min_liters > 0 && (
+                      <span className="text-[10px] text-slate-500">
+                        • Min {product.min_liters}L
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -436,7 +610,11 @@ export default function CatalogDrawer({ onClose }: CatalogDrawerProps) {
                         className="w-6 h-6 rounded bg-slate-800 hover:bg-rose-500/30 text-slate-200 hover:text-rose-200 flex items-center justify-center transition"
                         title={qty === 1 ? 'Tanktan Kaldır' : 'Adet Azalt'}
                       >
-                        {qty === 1 ? <Trash2 className="w-3 h-3 text-rose-400" /> : <Minus className="w-3 h-3" />}
+                        {qty === 1 ? (
+                          <Trash2 className="w-3 h-3 text-rose-400" />
+                        ) : (
+                          <Minus className="w-3 h-3" />
+                        )}
                       </button>
                       <span className="text-xs font-bold text-cyan-300 w-5 text-center">
                         {qty}

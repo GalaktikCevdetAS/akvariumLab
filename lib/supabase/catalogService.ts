@@ -13,6 +13,8 @@ export interface Product {
   ideal_ph_min: number;
   ideal_ph_max: number;
   bio_load: number;
+  volume_per_unit_lt?: number;
+  temperament?: string;
   description: string;
   color: string;
   fin_color?: string;
@@ -35,6 +37,23 @@ export interface Product {
   lumen: number;
   kelvin?: number;
   light_spectrum?: 'beyaz' | 'beyaz-mavi' | 'uc-renk' | string;
+
+  // Ekipman & Teknik Parametreler
+  watt?: number;
+  outlet_count?: number;
+  flow_rate_lph?: number;
+  filtration_power?: number;
+  shrimp_safe?: boolean;
+  needs_air_pump?: boolean;
+  placement_zone?: 'outside_left' | 'substrate' | 'glass_wall' | 'top_rim' | string;
+}
+
+export interface CatalogCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parent_slug: string | null;
+  target_table: string | null;
 }
 
 export interface CompatibilityRule {
@@ -52,72 +71,10 @@ export interface TankItem {
 
 export interface CatalogResponse {
   products: Product[];
+  categories: CatalogCategory[];
   rules: CompatibilityRule[];
   source: 'supabase' | 'error';
   errorMessage?: string;
-}
-
-function normalizeCategory(rawCategory: string): Product['category'] {
-  const cat = (rawCategory || '').toLowerCase().trim();
-  if (cat === 'balik' || cat === 'baliklar' || cat === 'canli' || cat === 'canlilar') {
-    return 'canlilar';
-  }
-  if (cat === 'bitki' || cat === 'bitkiler') return 'bitkiler';
-  if (cat === 'kum' || cat === 'kumlar' || cat === 'taban' || cat === 'dekor') return 'kumlar';
-  return 'malzemeler';
-}
-
-function inferSubCategory(
-  slug: string,
-  name: string,
-  category: Product['category'],
-  rawSub?: string
-): string {
-  if (rawSub && rawSub.trim().length > 0) return rawSub.toLowerCase().trim();
-  const s = `${slug} ${name}`.toLowerCase();
-
-  if (category === 'canlilar') {
-    if (s.includes('karides') || s.includes('shrimp') || s.includes('neocaridina')) return 'karidesler';
-    if (s.includes('salyangoz') || s.includes('snail') || s.includes('midye') || s.includes('nerite') || s.includes('elma')) return 'kabuklular';
-    if (s.includes('bocek') || s.includes('böcek') || s.includes('su-piresi') || s.includes('artemia')) return 'bocekler';
-    return 'baliklar';
-  }
-
-  if (category === 'bitkiler') {
-    if (s.includes('moss') || s.includes('yosun')) return 'yosunlar';
-    if (s.includes('anubias') || s.includes('bucephalandra') || s.includes('fern')) return 'rizom';
-    if (s.includes('pistia') || s.includes('salvinia') || s.includes('mercimek') || s.includes('ust')) return 'su-ustu';
-    return 'govdeli';
-  }
-
-  if (category === 'kumlar') {
-    if (s.includes('toprak') || s.includes('soil') || s.includes('aktif')) return 'aktif-toprak';
-    if (s.includes('kok') || s.includes('kök') || s.includes('mangrow') || s.includes('kaya') || s.includes('tas')) return 'dekor';
-    return 'kum';
-  }
-
-  if (s.startsWith('led-') || s.includes('isik') || s.includes('ışık') || s.includes('aydinlatma')) return 'isiklar';
-  if (s.includes('filtre') || s.includes('motor') || s.includes('kafa') || s.includes('hava')) return 'motorlar';
-  if (s.includes('isitici') || s.includes('ısıtıcı') || s.includes('co2') || s.includes('termostat')) return 'isitici-co2';
-  return 'diger-ekipman';
-}
-
-function inferSpeciesFromSlug(slug: string): string {
-  if (slug.startsWith('lepistes')) return 'lepistes';
-  if (slug.startsWith('beta')) return 'beta';
-  return slug;
-}
-
-function inferVariantFromSlug(slug: string): string {
-  if (slug.includes('crowntail')) return 'crowntail';
-  if (slug.includes('plakat')) return 'plakat';
-  if (slug.includes('dumbo')) return 'dumbo';
-  if (slug.includes('double-sword')) return 'double-sword';
-  if (slug.includes('lyra')) return 'lyra';
-  if (slug.endsWith('-erkek')) return 'erkek';
-  if (slug.endsWith('-disi')) return 'disi';
-  if (slug.endsWith('-yavru')) return 'yavru';
-  return 'standart';
 }
 
 function getDefaultColorBySlug(slug: string, category: Product['category']): string {
@@ -141,6 +98,115 @@ function getDefaultColorBySlug(slug: string, category: Product['category']): str
   return '#a855f7';
 }
 
+function buildAutoDescription(row: any, category: Product['category'], subCategory: string): string {
+  if (row.description && String(row.description).trim().length > 0) {
+    return String(row.description);
+  }
+  if (subCategory === 'aydinlatmalar') {
+    return `${row.length_cm || 50} cm • ${row.kelvin || 6500}K • ${row.lumen || 0} Lümen LED akvaryum armatürü.`;
+  }
+  if (subCategory === 'filtreler') {
+    const flow = row.flow_rate_lph ? `${row.flow_rate_lph} L/h debi • ` : '';
+    const shrimp = row.shrimp_safe ? 'Karides güvenli • ' : '';
+    return `${flow}${shrimp}Filtrasyon gücü: %${Math.round(Number(row.filtration_power || 0) * 100)}.`;
+  }
+  if (subCategory === 'hava-motorlari') {
+    return `${row.watt || 0}W • ${row.outlet_count || 1} çıkışlı • ${row.flow_rate_lph || 0} L/h hava motoru.`;
+  }
+  if (subCategory === 'hava-taslari') {
+    return `${row.length_cm || 3} cm hava taşı / difüzör (Hava motoru gerektirir).`;
+  }
+  if (category === 'kumlar') {
+    return `1 Kg başına ${row.volume_per_unit_lt ?? 0.65}L taban hacmi sağlar.`;
+  }
+  if (category === 'bitkiler') {
+    return `Doğal nitrat ve CO₂ tüketimi ile su kalitesini dengeler.`;
+  }
+  const temp =
+    row.min_temp && row.max_temp ? `${row.min_temp}-${row.max_temp}°C • ` : '';
+  const ph =
+    row.min_ph && row.max_ph ? `pH ${row.min_ph}-${row.max_ph}` : '';
+  return `${temp}${ph}`.trim() || 'Akvaryum ekosistemi uyumlu ürün.';
+}
+
+function normalizeRowToProduct(
+  row: any,
+  category: Product['category'],
+  subCategory: string
+): Product {
+  const slug = String(row.slug || row.id);
+  const name = String(row.name || 'İsimsiz Ürün');
+  const bodyColor = row.color
+    ? String(row.color)
+    : getDefaultColorBySlug(slug, category);
+
+  return {
+    id: String(row.id),
+    slug,
+    species: row.species ? String(row.species) : undefined,
+    variant: row.variant ? String(row.variant) : 'standart',
+    name,
+    category,
+    sub_category: subCategory,
+    price: Number(row.price ?? 0),
+    min_liters: Number(row.min_volume_lt ?? row.min_liters ?? 0),
+    ideal_temp_min: Number(row.min_temp ?? 20),
+    ideal_temp_max: Number(row.max_temp ?? 28),
+    ideal_ph_min: Number(row.min_ph ?? 6.5),
+    ideal_ph_max: Number(row.max_ph ?? 7.8),
+    bio_load: Number(row.bio_load ?? 0),
+    volume_per_unit_lt:
+      row.volume_per_unit_lt !== undefined && row.volume_per_unit_lt !== null
+        ? Number(row.volume_per_unit_lt)
+        : undefined,
+    temperament: row.temperament ? String(row.temperament) : undefined,
+    description: buildAutoDescription(row, category, subCategory),
+    color: bodyColor,
+    fin_color: row.fin_color ? String(row.fin_color) : bodyColor,
+    image_url: row.image_url ? String(row.image_url) : undefined,
+    swim_zone: (row.swim_zone as Product['swim_zone']) || 'orta',
+    length_cm: Number(row.length_cm ?? (category === 'bitkiler' ? 14 : 4.5)),
+
+    ammonia_rate: Number(row.ammonia_rate ?? 0),
+    nitrite_rate: Number(row.nitrite_rate ?? 0),
+    nitrate_rate: Number(row.nitrate_rate ?? 0),
+    o2_rate: Number(row.o2_rate ?? 0),
+    co2_rate: Number(row.co2_rate ?? 0),
+    ppm_impact: Number(row.ppm_impact ?? 0),
+    gh_impact: Number(row.gh_impact ?? 0),
+    kh_impact: Number(row.kh_impact ?? 0),
+    ph_impact: Number(row.ph_impact ?? 0),
+    tannin_rate: Number(row.tannin_rate ?? 0),
+    algae_control_rate: Number(row.algae_control_rate ?? 0),
+    lumen: Number(row.lumen ?? 0),
+    kelvin: row.kelvin ? Number(row.kelvin) : undefined,
+    light_spectrum: row.light_spectrum ? String(row.light_spectrum) : undefined,
+
+    watt: row.watt !== undefined && row.watt !== null ? Number(row.watt) : undefined,
+    outlet_count:
+      row.outlet_count !== undefined && row.outlet_count !== null
+        ? Number(row.outlet_count)
+        : undefined,
+    flow_rate_lph:
+      row.flow_rate_lph !== undefined && row.flow_rate_lph !== null
+        ? Number(row.flow_rate_lph)
+        : undefined,
+    filtration_power:
+      row.filtration_power !== undefined && row.filtration_power !== null
+        ? Number(row.filtration_power)
+        : undefined,
+    shrimp_safe:
+      row.shrimp_safe !== undefined && row.shrimp_safe !== null
+        ? Boolean(row.shrimp_safe)
+        : undefined,
+    needs_air_pump:
+      row.needs_air_pump !== undefined && row.needs_air_pump !== null
+        ? Boolean(row.needs_air_pump)
+        : undefined,
+    placement_zone: row.placement_zone ? String(row.placement_zone) : undefined,
+  };
+}
+
 export async function fetchCatalogWithStatus(): Promise<CatalogResponse> {
   try {
     const { createClient } = await import('./client');
@@ -149,77 +215,88 @@ export async function fetchCatalogWithStatus(): Promise<CatalogResponse> {
     if (!supabase) {
       return {
         products: [],
+        categories: [],
         rules: [],
         source: 'error',
-        errorMessage: '.env.local dosyasında Supabase URL veya Anon Key eksik.',
+        errorMessage: '.env.local dosyasında NEXT_PUBLIC_SUPABASE_URL veya ANON_KEY eksik.',
       };
     }
 
-    const [itemsRes, rulesRes] = await Promise.all([
-      supabase.from('catalog_items').select('*').order('name', { ascending: true }),
+    // Kolon bağımlılığı olmaması için .order() kullanmadan ham SELECT * çekip JS tarafında sıralıyoruz
+    const [
+      categoriesRes,
+      rulesRes,
+      baliklarRes,
+      karideslerRes,
+      salyangozlarRes,
+      bitkilerRes,
+      kumlarRes,
+      aydinlatmalarRes,
+      havaMotorlariRes,
+      havaTaslariRes,
+      filtrelerRes,
+    ] = await Promise.all([
+      supabase.from('catalog_categories').select('*'),
       supabase.from('compatibility_rules').select('*'),
+      supabase.from('baliklar').select('*'),
+      supabase.from('karidesler').select('*'),
+      supabase.from('salyangozlar').select('*'),
+      supabase.from('bitkiler').select('*'),
+      supabase.from('kumlar').select('*'),
+      supabase.from('aydinlatmalar').select('*'),
+      supabase.from('hava_motorlari').select('*'),
+      supabase.from('hava_taslari').select('*'),
+      supabase.from('filtreler').select('*'),
     ]);
 
-    if (itemsRes.error) {
-      return {
-        products: [],
-        rules: [],
-        source: 'error',
-        errorMessage: `Supabase Sorgu Hatası (${itemsRes.error.code}): ${itemsRes.error.message}`,
-      };
-    }
+    const tableQueries = [
+      { table: 'baliklar', res: baliklarRes },
+      { table: 'karidesler', res: karideslerRes },
+      { table: 'salyangozlar', res: salyangozlarRes },
+      { table: 'bitkiler', res: bitkilerRes },
+      { table: 'kumlar', res: kumlarRes },
+      { table: 'aydinlatmalar', res: aydinlatmalarRes },
+      { table: 'hava_motorlari', res: havaMotorlariRes },
+      { table: 'hava_taslari', res: havaTaslariRes },
+      { table: 'filtreler', res: filtrelerRes },
+    ];
 
-    const normalizedProducts: Product[] = (itemsRes.data || []).map((item: any) => {
-      const normalizedCategory = normalizeCategory(item.category);
-      const slug = String(item.slug);
-      const name = String(item.name);
-      const bodyColor = item.color ? String(item.color) : getDefaultColorBySlug(slug, normalizedCategory);
-      return {
-        id: String(item.id),
-        slug,
-        species: item.species ? String(item.species) : inferSpeciesFromSlug(slug),
-        variant: item.variant ? String(item.variant) : inferVariantFromSlug(slug),
-        name,
-        category: normalizedCategory,
-        sub_category: inferSubCategory(slug, name, normalizedCategory, item.sub_category),
-        price: Number(item.price ?? 0),
-        min_liters: Number(item.min_volume_lt ?? item.min_liters ?? 0),
-        ideal_temp_min: Number(item.min_temp ?? item.ideal_temp_min ?? 20),
-        ideal_temp_max: Number(item.max_temp ?? item.ideal_temp_max ?? 28),
-        ideal_ph_min: Number(item.min_ph ?? item.ideal_ph_min ?? 6.5),
-        ideal_ph_max: Number(item.max_ph ?? item.ideal_ph_max ?? 7.8),
-        bio_load: Number(item.bio_load ?? 0),
-        description: String(item.description ?? ''),
-        color: bodyColor,
-        fin_color: item.fin_color ? String(item.fin_color) : bodyColor,
-        image_url: item.image_url ? String(item.image_url) : undefined,
-        swim_zone: (item.swim_zone as Product['swim_zone']) || 'orta',
-        length_cm: Number(item.length_cm ?? (normalizedCategory === 'bitkiler' ? 14 : 4.5)),
+    const errors = tableQueries
+      .filter((q) => q.res.error)
+      .map((q) => `${q.table}: ${q.res.error!.message} (${q.res.error!.code})`);
 
-        ammonia_rate: Number(item.ammonia_rate ?? 0),
-        nitrite_rate: Number(item.nitrite_rate ?? 0),
-        nitrate_rate: Number(item.nitrate_rate ?? 0),
-        o2_rate: Number(item.o2_rate ?? 0),
-        co2_rate: Number(item.co2_rate ?? 0),
-        ppm_impact: Number(item.ppm_impact ?? 0),
-        gh_impact: Number(item.gh_impact ?? 0),
-        kh_impact: Number(item.kh_impact ?? 0),
-        ph_impact: Number(item.ph_impact ?? 0),
-        tannin_rate: Number(item.tannin_rate ?? 0),
-        algae_control_rate: Number(item.algae_control_rate ?? 0),
-        lumen: Number(item.lumen ?? 0),
-        kelvin: item.kelvin ? Number(item.kelvin) : slug.includes('10000k') ? 10000 : 6500,
-        light_spectrum: item.light_spectrum
-          ? String(item.light_spectrum)
-          : slug.includes('uc-renk')
-          ? 'uc-renk'
-          : slug.includes('beyaz-mavi')
-          ? 'beyaz-mavi'
-          : slug.startsWith('led-')
-          ? 'beyaz'
-          : undefined,
-      };
-    });
+    const allProducts: Product[] = [
+      ...(baliklarRes.data || []).map((r) => normalizeRowToProduct(r, 'canlilar', 'baliklar')),
+      ...(karideslerRes.data || []).map((r) => normalizeRowToProduct(r, 'canlilar', 'karidesler')),
+      ...(salyangozlarRes.data || []).map((r) => normalizeRowToProduct(r, 'canlilar', 'salyangozlar')),
+      ...(bitkilerRes.data || []).map((r) => normalizeRowToProduct(r, 'bitkiler', 'bitkiler')),
+      ...(kumlarRes.data || []).map((r) => normalizeRowToProduct(r, 'kumlar', 'kumlar')),
+      ...(aydinlatmalarRes.data || []).map((r) =>
+        normalizeRowToProduct(r, 'malzemeler', 'aydinlatmalar')
+      ),
+      ...(havaMotorlariRes.data || []).map((r) =>
+        normalizeRowToProduct(r, 'malzemeler', 'hava-motorlari')
+      ),
+      ...(havaTaslariRes.data || []).map((r) =>
+        normalizeRowToProduct(r, 'malzemeler', 'hava-taslari')
+      ),
+      ...(filtrelerRes.data || []).map((r) =>
+        normalizeRowToProduct(r, 'malzemeler', 'filtreler')
+      ),
+    ];
+
+    // İsim sırasına göre JS içinde güvenli sırala
+    allProducts.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
+    const normalizedCategories: CatalogCategory[] = (categoriesRes.data || [])
+      .map((c: any) => ({
+        id: Number(c.id),
+        name: String(c.name),
+        slug: String(c.slug),
+        parent_slug: c.parent_slug ? String(c.parent_slug) : null,
+        target_table: c.target_table ? String(c.target_table) : null,
+      }))
+      .sort((a, b) => a.id - b.id);
 
     const normalizedRules: CompatibilityRule[] = (rulesRes.data || []).map((r: any) => ({
       id: String(r.id),
@@ -229,14 +306,32 @@ export async function fetchCatalogWithStatus(): Promise<CatalogResponse> {
       reason: String(r.reason),
     }));
 
+    // Hiç ürün dönmediyse nedenini açıkça raporla (RLS veya tablo hatası)
+    if (allProducts.length === 0) {
+      const detail =
+        errors.length > 0
+          ? `Tablo Hataları -> ${errors.join(' | ')}`
+          : 'Tüm tablolardan 0 satır döndü. Supabase RLS (Row Level Security) açık kalmış olabilir; tablolara SELECT (anon) izni verin.';
+      return {
+        products: [],
+        categories: normalizedCategories,
+        rules: normalizedRules,
+        source: 'error',
+        errorMessage: detail,
+      };
+    }
+
     return {
-      products: normalizedProducts,
+      products: allProducts,
+      categories: normalizedCategories,
       rules: normalizedRules,
       source: 'supabase',
+      errorMessage: errors.length > 0 ? errors.join(' | ') : undefined,
     };
   } catch (err: any) {
     return {
       products: [],
+      categories: [],
       rules: [],
       source: 'error',
       errorMessage: err?.message || 'Bilinmeyen bağlantı hatası',
@@ -246,8 +341,8 @@ export async function fetchCatalogWithStatus(): Promise<CatalogResponse> {
 
 export async function fetchCatalog(): Promise<Product[]> {
   const res = await fetchCatalogWithStatus();
-  if (res.source === 'error' && res.errorMessage) {
-    console.error('[Supabase Hatası]:', res.errorMessage);
+  if (res.errorMessage) {
+    console.error('[Supabase Katalog Uyarısı]:', res.errorMessage);
   }
   return res.products;
 }

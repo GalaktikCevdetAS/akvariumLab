@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TankItem, CompatibilityRule } from '../supabase/catalogService';
+import { PlacedSceneItem, TankBounds } from '@/types/aquarium';
 
 export interface WaterVisualState {
   phase: 'clean' | 'moderate' | 'algae' | 'tannin' | 'critical';
@@ -7,7 +8,7 @@ export interface WaterVisualState {
   opacity: number;
   roughness: number;
   label: string;
-  isLethal: boolean; // Balıkların ters dönüp su yüzeyine çıkma durumu
+  isLethal: boolean;
 }
 
 export interface EcosystemStatus {
@@ -16,24 +17,24 @@ export interface EcosystemStatus {
   bioLoad: number;
 
   // Azot Döngüsü (mg/L)
-  ammonia: number; // NH3/NH4+ (0.25 üstü tehlikeli, 1.0 üstü ölümcül)
-  nitrite: number; // NO2- (0.5 üstü tehlikeli, 2.0 üstü ölümcül)
-  nitrate: number; // NO3- (0-25 ideal, 40+ alg tetikleyici, 80+ toksik)
+  ammonia: number;
+  nitrite: number;
+  nitrate: number;
 
   // Gaz Dengesi
-  oxygen: number;  // O2 (mg/L - 6.5-8.5 ideal, 4.0 altı hipoksi)
-  co2: number;     // CO2 (ppm - 10-25 bitkili ideal, 35+ boğucu)
+  oxygen: number;
+  co2: number;
 
   // Mineraller & Sertlik
-  ppm: number;     // TDS / Toplam Çözünmüş Katı Madde (120-350 ppm)
-  gh: number;      // Genel Sertlik (°dH)
-  kh: number;      // Karbonat Sertliği (°dH)
+  ppm: number;
+  gh: number;
+  kh: number;
 
   // Aydınlatma & Alg Fotokimyası
   totalLumens: number;
   lightHours: number;
   lumenPerLiter: number;
-  algaeLevel: number; // 0 - 100%
+  algaeLevel: number;
 
   // Görsel Su Rengi ve Uyarılar
   waterVisuals: WaterVisualState;
@@ -55,12 +56,33 @@ export interface TankDimensionsCm {
 
 export function getTankDimensionsCm(tankCapacity: number): TankDimensionsCm {
   if (tankCapacity === 200) {
-    return { widthCm: 100, depthCm: 40, heightCm: 50, sceneWidth: 10.0, sceneHeight: 5.0, sceneDepth: 4.0 };
+    return {
+      widthCm: 100,
+      depthCm: 40,
+      heightCm: 50,
+      sceneWidth: 10.0,
+      sceneHeight: 5.0,
+      sceneDepth: 4.0,
+    };
   }
   if (tankCapacity === 100) {
-    return { widthCm: 80, depthCm: 35, heightCm: 40, sceneWidth: 8.0, sceneHeight: 4.0, sceneDepth: 3.5 };
+    return {
+      widthCm: 80,
+      depthCm: 35,
+      heightCm: 40,
+      sceneWidth: 8.0,
+      sceneHeight: 4.0,
+      sceneDepth: 3.5,
+    };
   }
-  return { widthCm: 50, depthCm: 30, heightCm: 35, sceneWidth: 5.0, sceneHeight: 3.5, sceneDepth: 3.0 };
+  return {
+    widthCm: 50,
+    depthCm: 30,
+    heightCm: 35,
+    sceneWidth: 5.0,
+    sceneHeight: 3.5,
+    sceneDepth: 3.0,
+  };
 }
 
 export function getMaxPlantsForTank(tankCapacity: number): number {
@@ -114,13 +136,6 @@ export function calculateTankZones(
   };
 }
 
-/**
- * Çok Parametreli Ortalama Su Rengi ve Optik Görünüm Hesaplayıcısı
- * - Temiz Kristal Mavi (#0284c7)
- * - Alg Patlaması / Yeşil Su (#15803d / #4d7c0f)
- * - Amonyak / Nitrit Toksisitesi (#dc2626 / #ea580c)
- * - Tanen / Kök Salınımı (#92400e)
- */
 function computeBlendedWaterVisuals(params: {
   ammonia: number;
   nitrite: number;
@@ -132,7 +147,6 @@ function computeBlendedWaterVisuals(params: {
 }): WaterVisualState {
   const { ammonia, nitrite, oxygen, algaeLevel, tanninScore } = params;
 
-  // Toksisite skoru (0..1)
   const toxicityFactor = Math.min(
     1,
     Math.max(
@@ -142,19 +156,14 @@ function computeBlendedWaterVisuals(params: {
     )
   );
 
-  // Alg yeşillenme skoru (0..1)
   const algaeFactor = Math.min(1, algaeLevel / 100);
-
-  // Tanen amber skoru (0..1)
   const tanninFactor = Math.min(1, tanninScore / 10);
 
-  // Temel renk vektörleri
-  const cleanColor = new THREE.Color('#0284c7');   // Kristal berrak mavi
-  const algaeColor = new THREE.Color('#16a34a');   // Zümrüt/yosun yeşili
-  const toxicColor = new THREE.Color('#dc2626');   // Toksik kızıl-turuncu
-  const tanninColor = new THREE.Color('#b45309');  // Amber / Blackwater
+  const cleanColor = new THREE.Color('#0284c7');
+  const algaeColor = new THREE.Color('#16a34a');
+  const toxicColor = new THREE.Color('#dc2626');
+  const tanninColor = new THREE.Color('#b45309');
 
-  // Ağırlıklı renk harmanlaması
   const finalColor = cleanColor.clone();
   if (tanninFactor > 0.05) {
     finalColor.lerp(tanninColor, tanninFactor * 0.65);
@@ -169,7 +178,6 @@ function computeBlendedWaterVisuals(params: {
   const hexColor = `#${finalColor.getHexString()}`;
   const isLethal = ammonia >= 1.0 || nitrite >= 2.0 || oxygen <= 3.2;
 
-  // Bulanıklık (opacity ve roughness)
   const turbidity = Math.max(toxicityFactor, algaeFactor * 0.85, tanninFactor * 0.4);
   const opacity = Number(Math.min(0.42, 0.13 + turbidity * 0.24).toFixed(3));
   const roughness = Number(Math.min(0.45, 0.10 + turbidity * 0.28).toFixed(2));
@@ -234,30 +242,28 @@ export function evaluateEcosystem(
   const warnings: string[] = [];
   const positiveNotes: string[] = [];
 
-  // Litre ölçek faktörü (50L baz alınır)
   const volumeScale = 50 / Math.max(10, tankCapacity);
 
   let totalBioLoad = 0;
   let minLitersRequired = 0;
 
-  // Ham akvaryum başlangıç değerleri (musluk / dinlenmiş çeşme suyu)
   let rawAmmonia = 0;
   let rawNitrite = 0;
-  let rawNitrate = 5.0; // Başlangıç 5 mg/L nitrat
-  let rawO2 = 7.8;      // Başlangıç 7.8 mg/L çözünmüş oksijen
-  let rawCo2 = 6.0;     // Başlangıç 6 ppm CO2
-  let ppm = 160;        // Başlangıç 160 ppm TDS
-  let gh = 6.0;         // Başlangıç 6 °dH GH
-  let kh = 4.5;         // Başlangıç 4.5 °dH KH
+  let rawNitrate = 5.0;
+  let rawO2 = 7.8;
+  let rawCo2 = 6.0;
+  let ppm = 160;
+  let gh = 6.0;
+  let kh = 4.5;
   let ph = 7.2;
   let tanninScore = 0;
   let algaeControlPower = 0;
   let extraLumens = 0;
 
-  // Kum ve bitki sayımları
   const sandItems = items.filter((i) => i.product.category === 'kumlar');
   const totalSandKg = sandItems.reduce((acc, i) => acc + i.quantity, 0);
-  const maxSandKg = Math.floor((tankCapacity * 0.25) / 0.65);
+  const unitVol = sandItems[0]?.product.volume_per_unit_lt || 0.65;
+  const maxSandKg = Math.floor((tankCapacity * 0.25) / unitVol);
 
   if (totalSandKg > maxSandKg) {
     warnings.push(`Maksimum kum sınırı aşıldı! (${tankCapacity}L için max ${maxSandKg} kg)`);
@@ -274,11 +280,46 @@ export function evaluateEcosystem(
     warnings.push(`Maksimum bitki sınırı aşıldı! (${tankCapacity}L tabanı için max ${maxPlants} adet)`);
   }
 
-  // Tüm ürünlerin kimyasal/fiziksel etkilerini topla
+  const totalAirOutlets = items
+    .filter((i) => i.quantity > 0 && i.product.sub_category === 'hava-motorlari')
+    .reduce((acc, i) => acc + (i.product.outlet_count || 1) * i.quantity, 0);
+
+  const airDrivenEquipmentCount = items
+    .filter((i) => i.quantity > 0 && i.product.needs_air_pump === true)
+    .reduce((acc, i) => acc + i.quantity, 0);
+
+  if (airDrivenEquipmentCount > 0 && totalAirOutlets === 0) {
+    warnings.push(
+      'Pipo filtre veya hava taşının çalışması için dışarıya en az 1 adet Hava Motoru eklemelisiniz!'
+    );
+  } else if (airDrivenEquipmentCount > totalAirOutlets) {
+    warnings.push(
+      `Hava motoru çıkışı yetersiz! (${airDrivenEquipmentCount} ekipman için ${totalAirOutlets} hava çıkışı mevcut)`
+    );
+  }
+
+  const hasShrimp = items.some(
+    (i) => i.quantity > 0 && i.product.sub_category === 'karidesler'
+  );
+  const hasUnsafeFilter = items.some(
+    (i) =>
+      i.quantity > 0 &&
+      i.product.sub_category === 'filtreler' &&
+      i.product.shrimp_safe === false
+  );
+  if (hasShrimp && hasUnsafeFilter) {
+    warnings.push(
+      'Dikkat: Motorlu iç filtre yavru karidesleri çekebilir! Karides tankları için Pipo Filtre önerilir.'
+    );
+  }
+
   items.forEach((item) => {
     const p = item.product;
     const qty = item.quantity;
     if (qty <= 0) return;
+
+    const isAirStarved = p.needs_air_pump === true && totalAirOutlets === 0;
+    const activeFactor = isAirStarved ? 0.15 : 1.0;
 
     totalBioLoad += p.bio_load * qty;
     if (p.min_liters > 0) {
@@ -288,8 +329,8 @@ export function evaluateEcosystem(
     rawAmmonia += p.ammonia_rate * qty * volumeScale;
     rawNitrite += p.nitrite_rate * qty * volumeScale;
     rawNitrate += p.nitrate_rate * qty * volumeScale;
-    rawO2 += p.o2_rate * qty * volumeScale;
-    rawCo2 += p.co2_rate * qty * volumeScale;
+    rawO2 += p.o2_rate * qty * volumeScale * activeFactor;
+    rawCo2 += p.co2_rate * qty * volumeScale * activeFactor;
 
     ppm += p.ppm_impact * qty * volumeScale;
     gh += p.gh_impact * qty * volumeScale;
@@ -301,33 +342,36 @@ export function evaluateEcosystem(
   });
 
   if (minLitersRequired > tankCapacity) {
-    warnings.push(`Seçilen tank hacmi (${tankCapacity}L) yetersiz! Önerilen min: ${minLitersRequired}L`);
+    warnings.push(
+      `Seçilen tank hacmi (${tankCapacity}L) yetersiz! Önerilen min: ${minLitersRequired}L`
+    );
   }
 
-  // Azot Döngüsü (Nitrifikasyon): Filtre varsa Amonyak -> Nitrit -> Nitrat dönüşümü gerçekleşir
-  const hasFilter = items.some(
-  (i) =>
-    i.quantity > 0 &&
-    (i.product.sub_category === 'motorlar' || i.product.slug.includes('filtre'))
-);
-  if (hasFilter) {
-    // Biyolojik filtrasyon amonyak ve nitriti parçalar, son ürün olarak bir miktar nitrat üretir
-    const convertedAmmonia = Math.max(0, rawAmmonia * 0.78);
+  const activeFilters = items.filter(
+    (i) => i.quantity > 0 && i.product.sub_category === 'filtreler'
+  );
+  if (activeFilters.length > 0) {
+    const totalFiltrationPower = activeFilters.reduce((acc, f) => {
+      const airModifier =
+        f.product.needs_air_pump && totalAirOutlets === 0 ? 0.1 : 1.0;
+      const power = f.product.filtration_power ?? 0.7;
+      return acc + power * f.quantity * airModifier;
+    }, 0);
+
+    const conversionEfficiency = Math.min(0.92, totalFiltrationPower * 0.85);
+    const convertedAmmonia = Math.max(0, rawAmmonia * conversionEfficiency);
     rawAmmonia = Math.max(0, rawAmmonia - convertedAmmonia);
-    rawNitrite = Math.max(0, rawNitrite - convertedAmmonia * 0.65);
-    rawNitrate += convertedAmmonia * 2.2;
+    rawNitrite = Math.max(0, rawNitrite - convertedAmmonia * 0.72);
+    rawNitrate += convertedAmmonia * 2.1;
   } else if (totalBioLoad > 3) {
     warnings.push('Filtrasyon yok! Amonyak ve Nitrit hızla birikiyor.');
   }
 
-  // Işık (Lümen × Saat) ve Bitki Fotosentez / Alg Dengesi
-  // Varsayılan tank kapağı ışığı (tank kapasitesine göre) + eklenen aydınlatmalar
   const baseTankLumens = tankCapacity === 200 ? 2200 : tankCapacity === 100 ? 1200 : 650;
   const totalLumens = baseTankLumens + extraLumens;
   const lumenPerLiter = totalLumens / Math.max(10, tankCapacity);
-  const dailyLightEnergy = lumenPerLiter * lightHours; // Örn: 15 lm/L * 8 saat = 120 birim
+  const dailyLightEnergy = lumenPerLiter * lightHours;
 
-  // Bitkiler ışık varken CO2 ve Nitrat tüketip O2 üretir; ışık aşırıysa tüketemedikleri besin alge dönüşür
   const plantLightCapacity = (currentPlants / Math.max(1, maxPlants)) * 180;
   const excessLightEnergy = Math.max(0, dailyLightEnergy - (95 + plantLightCapacity));
 
@@ -338,12 +382,13 @@ export function evaluateEcosystem(
     rawNitrate = Math.max(0, rawNitrate - photosynthesisBoost * 8.0);
   }
 
-  // Alg Yoğunluğu Hesabı (Aşırı ışık + yüksek Nitrat - Alg yiyiciler/filtre)
   const nutrientFuel = Math.max(0, rawNitrate - 10) * 1.1 + Math.max(0, rawAmmonia) * 15;
-  const rawAlgae = (excessLightEnergy * 0.48) + (nutrientFuel * (lightHours / 10)) - (algaeControlPower * 12);
+  const rawAlgae =
+    excessLightEnergy * 0.48 +
+    nutrientFuel * (lightHours / 10) -
+    algaeControlPower * 12;
   const algaeLevel = Number(Math.min(100, Math.max(0, rawAlgae)).toFixed(1));
 
-  // CO2 artışı pH'ı düşürür (karbonik asit dengesi)
   const co2PhShift = -Math.max(0, rawCo2 - 10) * 0.015;
   const finalPh = Number(Math.min(8.6, Math.max(5.4, ph + co2PhShift)).toFixed(2));
   const finalAmmonia = Number(Math.max(0, rawAmmonia).toFixed(2));
@@ -355,7 +400,6 @@ export function evaluateEcosystem(
   const finalGh = Number(Math.max(1, gh).toFixed(1));
   const finalKh = Number(Math.max(1, kh).toFixed(1));
 
-  // Kimyasal Eşik Uyarıları
   if (finalAmmonia >= 0.5) {
     warnings.push(`Yüksek Amonyak (${finalAmmonia} mg/L)! Su değişimi veya filtre gerekli.`);
   }
@@ -372,13 +416,65 @@ export function evaluateEcosystem(
     warnings.push(`Yüksek CO2 (${finalCo2} ppm)! Balıklarda boğulma riski.`);
   }
   if (algaeLevel >= 50) {
-    warnings.push(`Alg Patlaması (%${Math.round(algaeLevel)})! Işık süresini (${lightHours}s) azaltın veya alg yiyici ekleyin.`);
+    warnings.push(
+      `Alg Patlaması (%${Math.round(algaeLevel)})! Işık süresini (${lightHours}s) azaltın veya alg yiyici ekleyin.`
+    );
   }
 
-  // Supabase compatibility_rules kontrolü
   const activeSlugs = new Set(items.filter((i) => i.quantity > 0).map((i) => i.product.slug));
+  const activeSpecies = new Set(
+    items
+      .filter((i) => i.quantity > 0 && i.product.species)
+      .map((i) => i.product.species!)
+  );
+
+  const matchesRuleKey = (ruleSlug: string) => {
+    if (activeSlugs.has(ruleSlug)) return true;
+    if (ruleSlug === 'beta-erkek') {
+      return items.some(
+        (i) =>
+          i.quantity > 0 &&
+          i.product.species === 'beta' &&
+          i.product.variant !== 'disi' &&
+          i.product.variant !== 'yavru'
+      );
+    }
+    if (ruleSlug === 'lepistes-erkek') {
+      return items.some(
+        (i) =>
+          i.quantity > 0 &&
+          i.product.species === 'lepistes' &&
+          i.product.variant !== 'disi' &&
+          i.product.variant !== 'yavru'
+      );
+    }
+    return activeSpecies.has(ruleSlug);
+  };
+
   rules.forEach((rule) => {
-    if (activeSlugs.has(rule.item_a_slug) && activeSlugs.has(rule.item_b_slug)) {
+    if (rule.item_a_slug === rule.item_b_slug) {
+      const matchingCount = items
+        .filter((i) => i.quantity > 0)
+        .reduce((sum, i) => {
+          if (i.product.slug === rule.item_a_slug) return sum + i.quantity;
+          if (
+            rule.item_a_slug === 'beta-erkek' &&
+            i.product.species === 'beta' &&
+            i.product.variant !== 'disi' &&
+            i.product.variant !== 'yavru'
+          ) {
+            return sum + i.quantity;
+          }
+          return sum;
+        }, 0);
+
+      if (matchingCount >= 2 && rule.status === 'uyumsuz') {
+        if (!warnings.includes(rule.reason)) warnings.push(rule.reason);
+      }
+      return;
+    }
+
+    if (matchesRuleKey(rule.item_a_slug) && matchesRuleKey(rule.item_b_slug)) {
       if (rule.status === 'uyumsuz') {
         if (!warnings.includes(rule.reason)) warnings.push(rule.reason);
       } else if (rule.status === 'uyumlu') {
@@ -420,4 +516,111 @@ export function evaluateEcosystem(
     maxPlants,
     currentPlants,
   };
+}
+
+export function isSpongeOrAirFilter(product: {
+  slug?: string;
+  name?: string;
+  needs_air_pump?: boolean;
+}): boolean {
+  const slug = (product.slug || '').toLowerCase();
+  const name = (product.name || '').toLowerCase();
+  return (
+    product.needs_air_pump === true ||
+    slug.includes('pipo') ||
+    slug.includes('sunger') ||
+    name.includes('pipo') ||
+    name.includes('sünger')
+  );
+}
+
+export function calculateTankBounds(
+  tankCapacity: number,
+  totalSandKg: number = 0
+): TankBounds {
+  const dims = getTankDimensionsCm(tankCapacity);
+  const width = dims.sceneWidth;
+  const height = dims.sceneHeight;
+  const depth = dims.sceneDepth;
+  const glassThickness = 0.04;
+
+  const bottomInnerY = -height / 2 + glassThickness;
+  const waterTop = height / 2 - 0.18;
+
+  const innerW = width - glassThickness * 2;
+  const innerD = depth - glassThickness * 2;
+  const sandVol = Math.max(0, totalSandKg) * 0.65;
+  const sandHeight = Math.min(height * 0.35, sandVol / Math.max(0.1, innerW * innerD));
+  const substrateTop = bottomInnerY + sandHeight;
+
+  return {
+    width,
+    height,
+    depth,
+    waterLevel: waterTop,
+    glassThickness,
+    minX: -innerW / 2,
+    maxX: innerW / 2,
+    minY: bottomInnerY,
+    maxY: height / 2,
+    minZ: -innerD / 2,
+    maxZ: innerD / 2,
+    substrateTop,
+    waterTop,
+  };
+}
+
+export function findValidPlacement(
+  product: TankItem['product'],
+  existingItems: PlacedSceneItem[],
+  bounds: TankBounds
+): [number, number, number] {
+  const randX = (margin = 0.35) =>
+    (Math.random() * 2 - 1) * Math.max(0.2, bounds.width / 2 - margin);
+  const randZ = (margin = 0.35) =>
+    (Math.random() * 2 - 1) * Math.max(0.2, bounds.depth / 2 - margin);
+
+  if (product.sub_category === 'hava-motorlari') {
+    const pumpIndex = existingItems.filter(
+      (i) => i.product.sub_category === 'hava-motorlari'
+    ).length;
+    const x = -bounds.width / 2 - 0.78;
+    const startZ = bounds.depth / 2 - 0.55;
+    const stepZ = Math.max(0.75, (bounds.depth - 0.85) / 3);
+    const z = startZ - Math.min(3, pumpIndex) * stepZ;
+    return [x, -bounds.height / 2, z];
+  }
+
+  if (product.sub_category === 'aydinlatmalar') {
+    return [0, bounds.height / 2, 0];
+  }
+
+  if (
+    product.category === 'kumlar' ||
+    product.category === 'bitkiler' ||
+    product.sub_category === 'hava-taslari' ||
+    isSpongeOrAirFilter(product)
+  ) {
+    return [randX(0.45), bounds.substrateTop, randZ(0.45)];
+  }
+
+  if (product.sub_category === 'filtreler') {
+    return [
+      bounds.maxX - 0.25,
+      Math.max(bounds.substrateTop + 0.1, bounds.waterTop - 1.05),
+      bounds.minZ + 0.15,
+    ];
+  }
+
+  const usableH = Math.max(0.4, bounds.waterTop - bounds.substrateTop);
+  let y = bounds.substrateTop + usableH * 0.5;
+  if (product.swim_zone === 'dip') {
+    y = bounds.substrateTop + 0.12 + Math.random() * (usableH * 0.2);
+  } else if (product.swim_zone === 'ust') {
+    y = bounds.substrateTop + usableH * (0.68 + Math.random() * 0.22);
+  } else {
+    y = bounds.substrateTop + usableH * (0.32 + Math.random() * 0.36);
+  }
+
+  return [randX(0.4), y, randZ(0.4)];
 }
